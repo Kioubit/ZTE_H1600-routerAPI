@@ -3,7 +3,7 @@ CLI API for ZTE H1600 routers
 ## Usage
 ```
 # python main.py
-Available commands: overview/raw/monitor <sec>/hosts/restart
+Available commands: overview/raw/monitor <sec>/hosts/dhcp/restart
 # python main.py overview
 Brief overview:
  Firmware: VXXXXXXX - XXXXXXXXXXX

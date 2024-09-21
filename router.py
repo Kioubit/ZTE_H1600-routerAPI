@@ -1,12 +1,12 @@
-from enum import Enum
+import json
 import re
 import urllib
-import urllib.request
 import urllib.parse
-import json
-from hashlib import sha256
+import urllib.request
 import xml.etree.ElementTree as xmlET
 from collections.abc import Sequence
+from enum import Enum
+from hashlib import sha256
 
 
 class RouterResponse:
@@ -23,42 +23,42 @@ class RouterResponse:
         item = root
         if xml_key != "":
             item = root.find(xml_key)
-        return _recursive_response_parse(item)
+        return self._recursive_response_parse(item)
 
     def to_json(self, xml_key: str = "") -> str:
         return json.dumps(self.to_dict(xml_key))
 
-
-def _recursive_response_parse(value: xmlET, depth: int = 0):
-    if depth == 5:
-        return ""
-    temp_result = {}
-    iterator = iter(value)
-    did_pass = False
-    for child in iterator:
-        did_pass = True
-        if child.tag == "ParaName":
-            if child.text in temp_result:
-                carry = temp_result.get(child.text)
-                if isinstance(carry, Sequence):
-                    temp_result[child.text].append(next(iterator).text)
+    @staticmethod
+    def _recursive_response_parse(value: xmlET, max_depth: int = 5):
+        if max_depth < 0:
+            return None
+        temp_result = {}
+        iterator = iter(value)
+        did_pass = False
+        for child in iterator:
+            did_pass = True
+            if child.tag == "ParaName":
+                if child.text in temp_result:
+                    carry = temp_result.get(child.text)
+                    if isinstance(carry, Sequence):
+                        temp_result[child.text].append(next(iterator).text)
+                    else:
+                        temp_result[child.text] = [carry, next(iterator).text]
                 else:
-                    temp_result[child.text] = [carry, next(iterator).text]
+                    temp_result[child.text] = next(iterator).text
             else:
-                temp_result[child.text] = next(iterator).text
-        else:
-            if child.tag in temp_result:
-                carry = temp_result[child.tag]
-                if isinstance(carry, Sequence):
-                    temp_result[child.tag].append(_recursive_response_parse(child, depth + 1))
+                if child.tag in temp_result:
+                    carry = temp_result[child.tag]
+                    if isinstance(carry, Sequence):
+                        temp_result[child.tag].append(RouterResponse._recursive_response_parse(child, max_depth - 1))
+                    else:
+                        temp_result[child.tag] = [carry, RouterResponse._recursive_response_parse(child, max_depth - 1)]
                 else:
-                    temp_result[child.tag] = [carry, _recursive_response_parse(child, depth + 1)]
-            else:
-                temp_result[child.tag] = _recursive_response_parse(child, depth + 1)
-    if not did_pass:
-        return value.text
+                    temp_result[child.tag] = RouterResponse._recursive_response_parse(child, max_depth - 1)
+        if not did_pass:
+            return value.text
 
-    return temp_result
+        return temp_result
 
 
 class ConnectionState(Enum):
@@ -220,3 +220,10 @@ class Router:
         self.__request_page("?_type=menuData&_tag=devmgr_restartmgr_lua.lua", is_query=True, data=(
                     "IF_ACTION=Restart&Btn_restart=&_sessionTOKEN=" + self.__session_token +
                     "&_sessionTOKENByPost=" + self.__session_token_by_post))
+
+    def request_local_net_status(self) -> list[RouterResponse]:
+        responses = []
+        self.enter_menu("localNetStatus")
+        responses.append(RouterResponse(self.__request_page("?_type=menuData&_tag=accessdev_landevs_lua.lua")))
+        responses.append(RouterResponse(self.__request_page("?_type=menuData&_tag=accessdev_ssiddev_lua.lua")))
+        return responses

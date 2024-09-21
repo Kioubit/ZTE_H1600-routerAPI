@@ -92,18 +92,38 @@ def main():
                     datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\t(Refresh every " + sys.argv[2] + " sec)")
                 print_stats(router_obj, dsl_name)
                 time.sleep(int(sys.argv[2]))
-        elif sys.argv[1] == "hosts":
+        elif sys.argv[1] == "dhcp":
             router_obj.login()
             hosts = router_obj.request_dhcp4_info().to_dict("OBJ_DHCPHOSTINFO_ID")["Instance"]
+            print("DHCP allocations")
             print(f"{'Hostname':<25}  {'IP Address':<15}  {'Port':<5}  {'Mac Address':<17}  {'Expiry':<15}")
             print(f"{'':-<83}")
             for host in hosts:
-                hostname = ""
-                if host["OBJ_DHCPHOSTINFO_ID.HostName"] is not None:
-                    hostname = host["OBJ_DHCPHOSTINFO_ID.HostName"]
-                print(f"{hostname:<25.24}  {host['OBJ_DHCPHOSTINFO_ID.IPAddr']:<15.14}"
+                print(f"{host.get('OBJ_DHCPHOSTINFO_ID.HostName') or '':<25.24}"
+                      f"  {host['OBJ_DHCPHOSTINFO_ID.IPAddr']:<15.14}"
                       f"  {host['OBJ_DHCPHOSTINFO_ID.PhyPortName']:<5.4}  {host['OBJ_DHCPHOSTINFO_ID.MACAddr']:<17.16}"
                       f"  {host['OBJ_DHCPHOSTINFO_ID.ExpiredTime']:<15.14}")
+            router_obj.logout()
+        elif sys.argv[1] == "hosts":
+            router_obj.login()
+            status_responses = router_obj.request_local_net_status()
+            lan_devices = status_responses[0].to_dict("./OBJ_ACCESSDEV_ID")["Instance"]
+            wlan_devices = status_responses[1].to_dict("./OBJ_ACCESSDEV_ID")["Instance"]
+
+            def print_devices(devices):
+                print(f"{'Hostname':<25}  {'IPv4 Address':<15}  {'IPv6 Address':<38}  {'Mac Address':<17}  {'Port':<6}")
+                print(f"{'':-<110}")
+                for device in devices:
+                    print(f"{device.get('HostName') or '':<25.24}  {device.get('IPAddress') or '':<15.14}"
+                          f"  {device.get('IPV6Address') or '':<38.37}"
+                          f"  {device.get('MACAddress') or '':<17.16}  {device.get('AliasName') or '':<6.5}")
+
+            print("LAN devices")
+            print_devices(lan_devices)
+            print("")
+
+            print("WLAN devices")
+            print_devices(wlan_devices)
             router_obj.logout()
         else:
             print_usage()
@@ -114,7 +134,7 @@ def main():
 
 def print_usage():
     print("CLI API for ZTE H1600 routers")
-    print("Available commands: overview/raw/monitor <sec>/hosts/restart")
+    print("Available commands: overview/raw/monitor <sec>/hosts/dhcp/restart")
 
 
 if __name__ == '__main__':
