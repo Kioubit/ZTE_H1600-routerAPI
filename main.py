@@ -5,6 +5,7 @@ import time
 import datetime
 import sys
 import os
+from getpass import getpass
 
 
 def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
@@ -57,7 +58,7 @@ def main():
         password = parser.get("config", "password")
 
     if not password:
-        password = input("Enter router password:").strip()
+        password = getpass("Enter router password:").strip()
 
     router_obj = Router(base_url, username, password)
     try:
