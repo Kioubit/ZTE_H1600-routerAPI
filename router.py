@@ -91,7 +91,7 @@ class Router:
             req.add_header("Cookie", cookie.partition(";")[0] + ";")
         if data:
             req.add_header("Content-Type", "application/x-www-form-urlencoded")
-            req.add_header("Check", sha256(data.encode()).hexdigest())
+            req.add_header("Check", self.__asy_encode(sha256(data.encode()).hexdigest()))
             response = urllib.request.urlopen(req, data=data.encode())
         else:
             response = urllib.request.urlopen(req)
@@ -227,3 +227,36 @@ class Router:
         responses.append(RouterResponse(self.__request_page("?_type=menuData&_tag=accessdev_landevs_lua.lua")))
         responses.append(RouterResponse(self.__request_page("?_type=menuData&_tag=accessdev_ssiddev_lua.lua")))
         return responses
+
+    @staticmethod
+    def __asy_encode(src_data):
+        """Ported from the javascript version"""
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives.serialization import load_pem_public_key
+        import base64
+
+        # Public key from the script
+        pub_key = ("-----BEGIN PUBLIC KEY-----\n"
+                   "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAodPTerkUVCYmv28SOfRV\n"
+                   "7UKHVujx/HjCUTAWy9l0L5H0JV0LfDudTdMNPEKloZsNam3YrtEnq6jqMLJV4ASb\n"
+                   "1d6axmIgJ636wyTUS99gj4BKs6bQSTUSE8h/QkUYv4gEIt3saMS0pZpd90y6+B/9\n"
+                   "hZxZE/RKU8e+zgRqp1/762TB7vcjtjOwXRDEL0w71Jk9i8VUQ59MR1Uj5E8X3WIc\n"
+                   "fYSK5RWBkMhfaTRM6ozS9Bqhi40xlSOb3GBxCmliCifOJNLoO9kFoWgAIw5hkSIb\n"
+                   "GH+4Csop9Uy8VvmmB+B3ubFLN35qIa5OG5+SDXn4L7FeAA5lRiGxRi8tsWrtew8w\n"
+                   "nwIDAQAB\n"
+                   "-----END PUBLIC KEY-----")
+
+        # Load the public key
+        key = load_pem_public_key(pub_key.encode(), backend=default_backend())
+
+        # Encrypt the data using PKCS1v15 padding
+        encrypted = key.encrypt(
+            src_data.encode(),
+            padding.PKCS1v15()
+        )
+
+        # Convert to base64 string
+        dest_data = base64.b64encode(encrypted).decode()
+
+        return dest_data

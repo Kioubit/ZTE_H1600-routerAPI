@@ -1,5 +1,7 @@
 # ZTE_H1600-routerAPI
 CLI API for ZTE H1600 routers
+
+Tested with firmware v7.x.x
 ## Usage
 ```
 # python main.py
