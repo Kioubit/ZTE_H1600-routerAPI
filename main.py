@@ -38,6 +38,20 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     print(f"{'IPv4:':>25} {uplink_stats['IPAddress']}")
     print(f"{'IPv6:':>25} {uplink_stats['Gua1']}/{uplink_stats['Gua1PrefixLen']}")
 
+    map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
+    print(f"{'MAP-E Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
+    print(f"{'MAP-E v4:':>25} {map_e_status['LocalIPv4Addr']}")
+    print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in map_e_status['PortRange'].split(";") if part], 10)}")
+
+
+def ellipsize_middle(text: str| list[any], max_length: int, placeholder="...") -> str:
+    if len(text) <= max_length:
+        return text
+    keep = max_length - len(placeholder)
+    left = (keep // 2)
+    right = keep - left
+
+    return f"{text[:left]}{placeholder}{text[-right:]}"
 
 def main():
     base_url = "http://192.168.1.1/"

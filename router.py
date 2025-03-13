@@ -213,6 +213,10 @@ class Router:
         self.enter_menu("statusMgr")
         return RouterResponse(self.__request_page("?_type=menuData&_tag=devmgr_statusmgr_lua.lua", is_query=True))
 
+    def request_map_e_info(self) -> RouterResponse:
+        self.enter_menu("wanmapestatus")
+        return RouterResponse(self.__request_page("?_type=menuData&_tag=Internet_Tunnel_MapeStatus_lua.lua", is_query=True))
+
     def restart(self):
         self.__enter_menu_force("statusMgr")
         self.__request_page("?_type=menuData&_tag=devmgr_statusmgr_lua.lua", is_query=True)
