@@ -19,4 +19,9 @@ Brief overview:
             Uptime (4/6): 0:14:42 / 0:14:49
                     IPv4: XXX.XXX.XXX.XXX
                     IPv6: XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/64
+            MAP-E Status: Connected
+                MAP-E v4: XXX.XXX.XXX.XXX
+              MAP-E PSID: Length: 6, Offset: 6, PortSetID: 12
+       MAP-E Port ranges: ...
+
 ```

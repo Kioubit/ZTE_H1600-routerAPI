@@ -41,6 +41,7 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
     print(f"{'MAP-E Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
     print(f"{'MAP-E v4:':>25} {map_e_status['LocalIPv4Addr']}")
+    print(f"{'MAP-E PSID:':>25} Length: {map_e_status["PSIDLen"]}, Offset: {map_e_status["PSIDOffset"]}, PortSetID: {map_e_status["PortSetID"]}")
     print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in map_e_status['PortRange'].split(";") if part], 10)}")
 
 
@@ -86,7 +87,6 @@ def main():
         elif sys.argv[1] == "raw":
             router_obj.login()
             stats = router_obj.request_stats()
-            router_obj.logout()
             dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
             uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
             uplink_stats = None
@@ -94,8 +94,12 @@ def main():
                 if item["WANCName"] == dsl_name:
                     uplink_stats = item
                     break
-            print(dsl_stats)
-            print(uplink_stats)
+            map_e_info = router_obj.request_map_e_info().to_dict()
+            router_obj.logout()
+            result = {"map-e-info": map_e_info, "dsl_stats": dsl_stats,
+                      "uplink_stats": uplink_stats}
+            import json
+            print(json.dumps(result))
         elif sys.argv[1] == "monitor":
             if len(sys.argv) != 3:
                 print("Missing 'seconds' parameter")
