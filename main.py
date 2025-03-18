@@ -26,10 +26,10 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     print(f"{'Uptime:':>25} {str(datetime.timedelta(seconds=int(dsl_stats['Showtime_start'])))}")
     print(
         f"{'Speed:':>25} {str(int(dsl_stats['Downstream_current_rate']) / 1000):>7}"
-        f" / {str(int(dsl_stats['Upstream_current_rate']) / 1000):<7} (mbps)")
+        f" / {str(int(dsl_stats['Upstream_current_rate']) / 1000):<7} (down/up mbps)")
     print(
         f"{'Max Speed:':>25} {str(int(dsl_stats['Downstream_max_rate']) / 1000):>7}"
-        f" / {str(int(dsl_stats['Upstream_max_rate']) / 1000):<7} (mbps)")
+        f" / {str(int(dsl_stats['Upstream_max_rate']) / 1000):<7} (down/up mbps)")
     print(f"{'Uplink:':>10}")
     print(f"{'Status (4/6):':>25} {uplink_stats['ConnStatus']}/{uplink_stats['ConnStatus6']}")
     print(
@@ -39,10 +39,11 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     print(f"{'IPv6:':>25} {uplink_stats['Gua1']}/{uplink_stats['Gua1PrefixLen']}")
 
     map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
+    print()
     print(f"{'MAP-E Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
     print(f"{'MAP-E v4:':>25} {map_e_status['LocalIPv4Addr']}")
     print(f"{'MAP-E PSID:':>25} Length: {map_e_status["PSIDLen"]}, Offset: {map_e_status["PSIDOffset"]}, PortSetID: {map_e_status["PortSetID"]}")
-    print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in map_e_status['PortRange'].split(";") if part], 10)}")
+    print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in (map_e_status.get('PortRange') or '').split(";") if part], 10)}")
 
 
 def ellipsize_middle(text: str| list[any], max_length: int, placeholder="...") -> str:
