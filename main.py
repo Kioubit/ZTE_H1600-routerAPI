@@ -8,18 +8,14 @@ import os
 from getpass import getpass
 
 
-def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
-    stats = router_obj.request_stats()
-    dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
-    uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
-    uplink_stats = None
-    for item in uplink_stats_array:
-        if item["WANCName"] == dsl_name:
-            uplink_stats = item
-            break
+def print_stats(stats: dict):
+    firmware = stats["firmware"]
+    dsl_stats = stats["dsl_stats"]
+    uplink_stats = stats["uplink_stats"]
+    map_e_status = stats["map_e_status"]
+
     print("Brief overview:")
-    if with_firmware_info:
-        firmware = router_obj.request_firmware_info().to_dict('./OBJ_DEVINFO_ID')["Instance"]
+    if firmware:
         print(f"{'Firmware:':>10} {firmware['SoftwareVer']} - {firmware['VerDate']}")
     print(f"{'DSL:':>10}")
     print(f"{'Status:':>25} {dsl_stats['Status']}")
@@ -38,7 +34,6 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     print(f"{'IPv4:':>25} {uplink_stats['IPAddress']}")
     print(f"{'IPv6:':>25} {uplink_stats['Gua1']}/{uplink_stats['Gua1PrefixLen']}")
 
-    map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
     print()
     print(f"{'MAP-E Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
     print(f"{'MAP-E v4:':>25} {map_e_status['LocalIPv4Addr']}")
@@ -46,7 +41,24 @@ def print_stats(router_obj: Router, dsl_name: str, with_firmware_info=False):
     print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in (map_e_status.get('PortRange') or '').split(";") if part], 10)}")
 
 
-def ellipsize_middle(text: str| list[any], max_length: int, placeholder="...") -> str:
+def fetch_stats(router_obj: Router, dsl_name: str, with_firmware_info: bool) -> dict:
+    stats = router_obj.request_stats()
+    dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
+    uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
+    uplink_stats = None
+    for item in uplink_stats_array:
+        if item["WANCName"] == dsl_name:
+            uplink_stats = item
+            break
+    map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
+    firmware = None
+    if with_firmware_info:
+        firmware = router_obj.request_firmware_info().to_dict('./OBJ_DEVINFO_ID')["Instance"]
+    return {"map_e_status": map_e_status, "dsl_stats": dsl_stats,
+              "uplink_stats": uplink_stats, "firmware": firmware}
+
+
+def ellipsize_middle(text: str| list, max_length: int, placeholder="...") -> str:
     if len(text) <= max_length:
         return text
     keep = max_length - len(placeholder)
@@ -80,25 +92,15 @@ def main():
     try:
         if sys.argv[1] == "overview":
             router_obj.login()
-            print_stats(router_obj, dsl_name, with_firmware_info=True)
+            stats = fetch_stats(router_obj, dsl_name, with_firmware_info=True)
+            print_stats(stats)
             router_obj.logout()
         elif sys.argv[1] == "restart":
             router_obj.login()
             router_obj.restart()
         elif sys.argv[1] == "raw":
             router_obj.login()
-            stats = router_obj.request_stats()
-            dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
-            uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
-            uplink_stats = None
-            for item in uplink_stats_array:
-                if item["WANCName"] == dsl_name:
-                    uplink_stats = item
-                    break
-            map_e_info = router_obj.request_map_e_info().to_dict()
-            router_obj.logout()
-            result = {"map-e-info": map_e_info, "dsl_stats": dsl_stats,
-                      "uplink_stats": uplink_stats}
+            result = fetch_stats(router_obj, dsl_name, with_firmware_info=True)
             import json
             print(json.dumps(result))
         elif sys.argv[1] == "monitor":
@@ -107,10 +109,11 @@ def main():
                 return
             router_obj.login()
             while True:
+                stats = fetch_stats(router_obj, dsl_name, with_firmware_info=False)
                 os.system('cls' if os.name == 'nt' else 'clear')
                 print(
                     datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\t(Refresh every " + sys.argv[2] + " sec)")
-                print_stats(router_obj, dsl_name)
+                print_stats(stats)
                 time.sleep(int(sys.argv[2]))
         elif sys.argv[1] == "dhcp":
             router_obj.login()

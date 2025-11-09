@@ -3,6 +3,7 @@ import re
 import urllib
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree
 import xml.etree.ElementTree as xmlET
 from collections.abc import Sequence
 from enum import Enum
@@ -29,7 +30,7 @@ class RouterResponse:
         return json.dumps(self.to_dict(xml_key))
 
     @staticmethod
-    def _recursive_response_parse(value: xmlET, max_depth: int = 5):
+    def _recursive_response_parse(value: xml.etree.ElementTree.Element, max_depth: int = 5):
         if max_depth < 0:
             return None
         temp_result = {}
