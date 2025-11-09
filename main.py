@@ -109,11 +109,14 @@ def main():
                 return
             router_obj.login()
             while True:
-                stats = fetch_stats(router_obj, dsl_name, with_firmware_info=False)
-                os.system('cls' if os.name == 'nt' else 'clear')
-                print(
-                    datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\t(Refresh every " + sys.argv[2] + " sec)")
-                print_stats(stats)
+                try:
+                    stats = fetch_stats(router_obj, dsl_name, with_firmware_info=False)
+                    os.system('cls' if os.name == 'nt' else 'clear')
+                    print(
+                        datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\t(Refresh every " + sys.argv[2] + " sec)")
+                    print_stats(stats)
+                except Exception as e:
+                    print("Error:", e)
                 time.sleep(int(sys.argv[2]))
         elif sys.argv[1] == "dhcp":
             router_obj.login()
