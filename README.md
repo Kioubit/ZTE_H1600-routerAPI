@@ -9,20 +9,32 @@ Available commands: overview/raw/monitor <sec>/hosts/dhcp/restart
 # python main.py overview
 Brief overview:
  Firmware: VXXXXXXX - XXXXXXXXXXX
+Brief overview:
       DSL:
+                  Status: Disabled
+                  Uptime: 0:00:00
+                   Speed:     0.0 / 0.0     (down/up mbps)
+               Max Speed:     0.0 / 0.0     (down/up mbps)
+ Ethernet:
                   Status: Up
-                  Uptime: 0:15:10
-                   Speed:  20.021 / 10.149   (down/up mbps)
-               Max Speed: 200.193 / 100.536  (down/up mbps)
-   Uplink:
+         Packets (rx/tx): 701162/316412
+           Bytes (rx/tx): 715576291/85543150
+
+Uplink DSL:
+            Status (4/6): Unconfigured/Disconnected
+            Uptime (4/6): 0:00:00 / 0:00:00
+                    IPv4: 0.0.0.0
+                    IPv6: ::/0
+
+Uplink Ethernet:
             Status (4/6): Connected/Connected
-            Uptime (4/6): 0:14:42 / 0:14:49
+            Uptime (4/6): 1:03:37 / 1:03:37
                     IPv4: XXX.XXX.XXX.XXX
                     IPv6: XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/64
 
-            MAP-E Status: Connected
-                MAP-E v4: XXX.XXX.XXX.XXX
-              MAP-E PSID: Length: 6, Offset: 6, PortSetID: 12
-       MAP-E Port ranges: ...
-
+    MAP-E:
+                  Status: Connected
+                      v4: XXX.XXX.XXX.XXX
+                    PSID: Length: 6, Offset: 1, PortSetID: 12
+             Port ranges: ...
 ```

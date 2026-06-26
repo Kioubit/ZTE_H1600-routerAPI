@@ -12,6 +12,8 @@ def print_stats(stats: dict):
     firmware = stats["firmware"]
     dsl_stats = stats["dsl_stats"]
     uplink_stats = stats["uplink_stats"]
+    ethernet_uplink_stats = stats["ethernet_uplink_stats"]
+    ethernet_link_stats = stats["ethernet_link_stats"]
     map_e_status = stats["map_e_status"]
 
     print("Brief overview:")
@@ -26,7 +28,15 @@ def print_stats(stats: dict):
     print(
         f"{'Max Speed:':>25} {str(int(dsl_stats['Downstream_max_rate']) / 1000):>7}"
         f" / {str(int(dsl_stats['Upstream_max_rate']) / 1000):<7} (down/up mbps)")
-    print(f"{'Uplink:':>10}")
+
+    print(f"{'Ethernet:':>10}")
+    print(f"{'Status:':>25} {ethernet_link_stats['Status']}")
+    print(f"{'Packets (rx/tx):':>25} {ethernet_link_stats['PacketsReceived']}/{ethernet_link_stats['PacketsSent']}")
+    print(f"{'Bytes (rx/tx):':>25} {ethernet_link_stats['BytesReceived']}/{ethernet_link_stats['BytesSent']}")
+
+    print()
+
+    print(f"{'Uplink DSL:':>10}")
     print(f"{'Status (4/6):':>25} {uplink_stats['ConnStatus']}/{uplink_stats['ConnStatus6']}")
     print(
         f"{'Uptime (4/6):':>25} {str(datetime.timedelta(seconds=int(uplink_stats['UpTime'])))}"
@@ -35,13 +45,25 @@ def print_stats(stats: dict):
     print(f"{'IPv6:':>25} {uplink_stats['Gua1']}/{uplink_stats['Gua1PrefixLen']}")
 
     print()
-    print(f"{'MAP-E Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
-    print(f"{'MAP-E v4:':>25} {map_e_status['LocalIPv4Addr']}")
-    print(f"{'MAP-E PSID:':>25} Length: {map_e_status["PSIDLen"]}, Offset: {map_e_status["PSIDOffset"]}, PortSetID: {map_e_status["PortSetID"]}")
-    print(f"{'MAP-E Port ranges:':>25} {ellipsize_middle([part for part in (map_e_status.get('PortRange') or '').split(";") if part], 10)}")
+
+    print(f"{'Uplink Ethernet:':>10}")
+    print(f"{'Status (4/6):':>25} {ethernet_uplink_stats['ConnStatus']}/{ethernet_uplink_stats['ConnStatus6']}")
+    print(
+        f"{'Uptime (4/6):':>25} {str(datetime.timedelta(seconds=int(ethernet_uplink_stats['UpTime'])))}"
+        f" / {str(datetime.timedelta(seconds=int(ethernet_uplink_stats['UpTimeV6'])))}")
+    print(f"{'IPv4:':>25} {ethernet_uplink_stats['IPAddress']}")
+    print(f"{'IPv6:':>25} {ethernet_uplink_stats['Gua1']}/{ethernet_uplink_stats['Gua1PrefixLen']}")
+
+    print()
+
+    print(f"{'MAP-E:':>10}")
+    print(f"{'Status:':>25} {"Connected" if map_e_status['ConnStatus'] == '1' else "Disconnected"}")
+    print(f"{'v4:':>25} {map_e_status['LocalIPv4Addr']}")
+    print(f"{'PSID:':>25} Length: {map_e_status["PSIDLen"]}, Offset: {map_e_status["PSIDOffset"]}, PortSetID: {map_e_status["PortSetID"]}")
+    print(f"{'Port ranges:':>25} {ellipsize_middle([part for part in (map_e_status.get('PortRange') or '').split(";") if part], 10)}")
 
 
-def fetch_stats(router_obj: Router, dsl_name: str, with_firmware_info: bool) -> dict:
+def fetch_stats(router_obj: Router, dsl_name: str, ethernet_name: str, with_firmware_info: bool) -> dict:
     stats = router_obj.request_stats()
     dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
     uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
@@ -50,11 +72,21 @@ def fetch_stats(router_obj: Router, dsl_name: str, with_firmware_info: bool) -> 
         if item["WANCName"] == dsl_name:
             uplink_stats = item
             break
+
+    ethernet_stats = router_obj.request_stats_ethernet()
+    ethernet_link_stats = ethernet_stats[0].to_dict("./OBJ_ETH_ID")["Instance"]
+    ethernet_uplink_stats_array = ethernet_stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
+    ethernet_uplink_stats = None
+    for item in ethernet_uplink_stats_array:
+        if item["WANCName"] == ethernet_name:
+            ethernet_uplink_stats = item
+            break
+
     map_e_status = router_obj.request_map_e_info().to_dict("./OBJ_MAPESTATUS_ID")["Instance"]
     firmware = None
     if with_firmware_info:
         firmware = router_obj.request_firmware_info().to_dict('./OBJ_DEVINFO_ID')["Instance"]
-    return {"map_e_status": map_e_status, "dsl_stats": dsl_stats,
+    return {"map_e_status": map_e_status, "dsl_stats": dsl_stats, "ethernet_link_stats": ethernet_link_stats, "ethernet_uplink_stats": ethernet_uplink_stats,
               "uplink_stats": uplink_stats, "firmware": firmware}
 
 
@@ -72,6 +104,7 @@ def main():
     username = "admin"
     password = None
     dsl_name = "VDSL_INTERNET"
+    ethernet_name = "ETH_INTERNET"
 
     if len(sys.argv) < 2:
         print_usage()
@@ -82,6 +115,7 @@ def main():
         parser.read("config")
         base_url = parser.get("config", "base_url")
         dsl_name = parser.get("config", "dsl_name")
+        ethernet_name = parser.get("config", "ethernet_name")
         username = parser.get("config", "username")
         password = parser.get("config", "password")
 
@@ -92,7 +126,7 @@ def main():
     try:
         if sys.argv[1] == "overview":
             router_obj.login()
-            stats = fetch_stats(router_obj, dsl_name, with_firmware_info=True)
+            stats = fetch_stats(router_obj, dsl_name, ethernet_name, with_firmware_info=True)
             print_stats(stats)
             router_obj.logout()
         elif sys.argv[1] == "restart":
@@ -100,7 +134,7 @@ def main():
             router_obj.restart()
         elif sys.argv[1] == "raw":
             router_obj.login()
-            result = fetch_stats(router_obj, dsl_name, with_firmware_info=True)
+            result = fetch_stats(router_obj, dsl_name, ethernet_name, with_firmware_info=True)
             import json
             print(json.dumps(result))
         elif sys.argv[1] == "monitor":
@@ -110,8 +144,9 @@ def main():
             router_obj.login()
             while True:
                 try:
-                    stats = fetch_stats(router_obj, dsl_name, with_firmware_info=False)
-                    os.system('cls' if os.name == 'nt' else 'clear')
+                    stats = fetch_stats(router_obj, dsl_name, ethernet_name, with_firmware_info=False)
+                    import subprocess
+                    subprocess.run('cls' if os.name == 'nt' else 'clear', shell=True)
                     print(
                         datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") + "\t(Refresh every " + sys.argv[2] + " sec)")
                     print_stats(stats)

@@ -74,7 +74,7 @@ class Router:
     __password = ""
     # Session cookie
     __sess_id_cookie = ""
-    # Except for login where it is returned in JSON it is found inside javascript on menuView requests
+    # Except for login where it is returned in JSON it is found inside JavaScript on menuView requests
     __session_token = ""
     # Temporary CSRF token
     __session_token_by_post = ""
@@ -206,6 +206,12 @@ class Router:
                                            is_query=True)
         return RouterResponse(dsl_stats), RouterResponse(uplink_stats)
 
+    def request_stats_ethernet(self) -> tuple[RouterResponse, RouterResponse]:
+        self.enter_menu("ethWanStatus")
+        ethernet_interface_stats = self.__request_page("?_type=menuData&_tag=eth_interface_status_lua.lua", is_query=True)
+        uplink_stats_ethernet = self.__request_page("?_type=menuData&_tag=wan_internet_lua.lua&TypeUplink=2&pageType=1", is_query=True)
+        return RouterResponse(ethernet_interface_stats), RouterResponse(uplink_stats_ethernet)
+
     def request_dhcp4_info(self) -> RouterResponse:
         self.enter_menu("lanMgrIpv4")
         return RouterResponse(self.__request_page("?_type=menuData&_tag=dhcp4s_dhcphostinfo_m.lua", is_query=True))
@@ -235,7 +241,7 @@ class Router:
 
     @staticmethod
     def __asy_encode(src_data):
-        """Ported from the javascript version"""
+        """Ported from the JavaScript version"""
         from cryptography.hazmat.primitives.asymmetric import padding
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import load_pem_public_key
