@@ -1,5 +1,6 @@
 [config]
-base_url=http://192.168.1.1/
+base_url=https://192.168.1.1/
+verify_cert=False
 dsl_name=VDSL_INTERNET
 ethernet_name=ETH_INTERNET
 username=admin

@@ -8,7 +8,7 @@ Tested with firmware v7.x.x
 Available commands: overview/raw/monitor <sec>/hosts/dhcp/restart
 # python main.py overview
 Brief overview:
- Firmware: VXXXXXXX - XXXXXXXXXXX
+ Firmware: VXXXXXXX - XXXXXXXXXXX  | Local time: XXXX-XX-XXT10:30:01
 Brief overview:
       DSL:
                   Status: Disabled

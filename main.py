@@ -18,10 +18,10 @@ def print_stats(stats: dict):
 
     print("Brief overview:")
     if firmware:
-        print(f"{'Firmware:':>10} {firmware['SoftwareVer']} - {firmware['VerDate']}")
+        print(f"{'Firmware:':>10} {firmware['SoftwareVer']} - {firmware['VerDate']} | {'Local time:':>10} {stats['time']}")
     print(f"{'DSL:':>10}")
     print(f"{'Status:':>25} {dsl_stats['Status']}")
-    print(f"{'Uptime:':>25} {str(datetime.timedelta(seconds=int(dsl_stats['Showtime_start'])))}")
+    print(f"{'Uptime:':>25} {datetime.timedelta(seconds=int(dsl_stats['Showtime_start']))}")
     print(
         f"{'Speed:':>25} {str(int(dsl_stats['Downstream_current_rate']) / 1000):>7}"
         f" / {str(int(dsl_stats['Upstream_current_rate']) / 1000):<7} (down/up mbps)")
@@ -36,23 +36,21 @@ def print_stats(stats: dict):
 
     print()
 
+    def format_uplink_stats(format_stats):
+        print(f"{'Status (4/6):':>25} {format_stats['ConnStatus']}/{format_stats['ConnStatus6']}")
+        print(
+            f"{'Uptime (4/6):':>25} {datetime.timedelta(seconds=int(format_stats['UpTime']))}"
+            f" / {datetime.timedelta(seconds=int(format_stats['UpTimeV6']))}")
+        print(f"{'IPv4:':>25} {format_stats['IPAddress']}")
+        print(f"{'IPv6:':>25} {format_stats['Gua1']}/{format_stats['Gua1PrefixLen']}")
+
     print(f"{'Uplink DSL:':>10}")
-    print(f"{'Status (4/6):':>25} {uplink_stats['ConnStatus']}/{uplink_stats['ConnStatus6']}")
-    print(
-        f"{'Uptime (4/6):':>25} {str(datetime.timedelta(seconds=int(uplink_stats['UpTime'])))}"
-        f" / {str(datetime.timedelta(seconds=int(uplink_stats['UpTimeV6'])))}")
-    print(f"{'IPv4:':>25} {uplink_stats['IPAddress']}")
-    print(f"{'IPv6:':>25} {uplink_stats['Gua1']}/{uplink_stats['Gua1PrefixLen']}")
+    format_uplink_stats(uplink_stats)
 
     print()
 
     print(f"{'Uplink Ethernet:':>10}")
-    print(f"{'Status (4/6):':>25} {ethernet_uplink_stats['ConnStatus']}/{ethernet_uplink_stats['ConnStatus6']}")
-    print(
-        f"{'Uptime (4/6):':>25} {str(datetime.timedelta(seconds=int(ethernet_uplink_stats['UpTime'])))}"
-        f" / {str(datetime.timedelta(seconds=int(ethernet_uplink_stats['UpTimeV6'])))}")
-    print(f"{'IPv4:':>25} {ethernet_uplink_stats['IPAddress']}")
-    print(f"{'IPv6:':>25} {ethernet_uplink_stats['Gua1']}/{ethernet_uplink_stats['Gua1PrefixLen']}")
+    format_uplink_stats(ethernet_uplink_stats)
 
     print()
 
@@ -64,6 +62,8 @@ def print_stats(stats: dict):
 
 
 def fetch_stats(router_obj: Router, dsl_name: str, ethernet_name: str, with_firmware_info: bool) -> dict:
+    sntp_data = router_obj.request_page("?_type=hiddenData&_tag=sntp_data", is_query=True).to_dict("OBJ_SNTP_ID")["Instance"]
+
     stats = router_obj.request_stats()
     dsl_stats = stats[0].to_dict('./OBJ_DSLINTERFACE_ID')["Instance"]
     uplink_stats_array = stats[1].to_dict("./ID_WAN_COMFIG")["Instance"]
@@ -87,12 +87,12 @@ def fetch_stats(router_obj: Router, dsl_name: str, ethernet_name: str, with_firm
     if with_firmware_info:
         firmware = router_obj.request_firmware_info().to_dict('./OBJ_DEVINFO_ID')["Instance"]
     return {"map_e_status": map_e_status, "dsl_stats": dsl_stats, "ethernet_link_stats": ethernet_link_stats, "ethernet_uplink_stats": ethernet_uplink_stats,
-              "uplink_stats": uplink_stats, "firmware": firmware}
+              "uplink_stats": uplink_stats, "firmware": firmware, "time": sntp_data["CurrentLocalTime"]}
 
 
 def ellipsize_middle(text: str| list, max_length: int, placeholder="...") -> str:
     if len(text) <= max_length:
-        return text
+        return str(text)
     keep = max_length - len(placeholder)
     left = (keep // 2)
     right = keep - left
@@ -103,6 +103,7 @@ def main():
     base_url = "http://192.168.1.1/"
     username = "admin"
     password = None
+    verify_cert = False
     dsl_name = "VDSL_INTERNET"
     ethernet_name = "ETH_INTERNET"
 
@@ -118,11 +119,12 @@ def main():
         ethernet_name = parser.get("config", "ethernet_name")
         username = parser.get("config", "username")
         password = parser.get("config", "password")
+        verify_cert = parser.getboolean("config", "verify_cert")
 
     if not password:
         password = getpass("Enter router password:").strip()
 
-    router_obj = Router(base_url, username, password)
+    router_obj = Router(base_url, username, password, verify_cert)
     try:
         if sys.argv[1] == "overview":
             router_obj.login()

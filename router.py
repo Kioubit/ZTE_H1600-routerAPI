@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
 import json
 import re
+import ssl
 import urllib
 import urllib.parse
 import urllib.request
@@ -21,9 +23,11 @@ class RouterResponse:
 
     def to_dict(self, xml_key: str = ""):
         root = xmlET.fromstring(self.__response)
-        item = root
-        if xml_key != "":
-            item = root.find(xml_key)
+        if xml_key == "":
+            return self._recursive_response_parse(root)
+        item = root.find(xml_key)
+        if item is None:
+            raise ValueError(f"Key '{xml_key}' not found in XML response")
         return self._recursive_response_parse(item)
 
     def to_json(self, xml_key: str = "") -> str:
@@ -72,6 +76,7 @@ class Router:
     __base_url = ""
     __username = ""
     __password = ""
+    __verify_cert = True
     # Session cookie
     __sess_id_cookie = ""
     # Except for login where it is returned in JSON it is found inside JavaScript on menuView requests
@@ -81,27 +86,34 @@ class Router:
     __desired_menu = ""
     __current_menu = ""
 
-    def __init__(self, base_url: str, username: str, password: str):
+    def __init__(self, base_url: str, username: str, password: str, verify_cert: bool):
         self.__base_url = base_url
         self.__username = username
         self.__password = password
+        self.__verify_cert = verify_cert
 
     def __make_request(self, url: str, save_session_cookie: bool = False, cookie: str = "", data: str|None = None) -> str:
         req = urllib.request.Request(url)
         if cookie:
             req.add_header("Cookie", cookie.partition(";")[0] + ";")
+
+        ssl_context = None if self.__verify_cert else ssl.create_default_context()
+        if not self.__verify_cert:
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
         if data:
             req.add_header("Content-Type", "application/x-www-form-urlencoded")
             req.add_header("Check", self.__asy_encode(sha256(data.encode()).hexdigest()))
-            response = urllib.request.urlopen(req, data=data.encode())
+            response = urllib.request.urlopen(req, data=data.encode(), context=ssl_context)
         else:
-            response = urllib.request.urlopen(req)
+            response = urllib.request.urlopen(req, context=ssl_context)
         if response.getcode() != 200:
             raise Exception("HTTP Status code != 200")
         if save_session_cookie:
             cookies = response.info().get_all('Set-Cookie')
             for cookie in cookies:
-                if cookie.startswith("SID="):
+                if cookie.startswith("SID=") or cookie.startswith("SID_HTTPS_="):
                     self.__sess_id_cookie = cookie
         page = response.read().decode("utf-8")
         return page
@@ -123,6 +135,8 @@ class Router:
         login_token_xml = self.__make_request(self.__base_url + "?_type=loginData&_tag=login_token",
                                               True, cookie=self.__sess_id_cookie)
         login_token_re = re.search('<ajax_response_xml_root>(.*)</ajax_response_xml_root>', login_token_xml)
+        if login_token_re is None:
+            raise ValueError("Could not find ajax_response_xml_root in the response")
         login_token = login_token_re.group(1)
         hashed_password = sha256(self.__password.encode() + login_token.encode()).hexdigest()
         login_string = "Password=" + hashed_password + "&Username=" + self.__username + "&_sessionTOKEN=" + \
@@ -158,10 +172,15 @@ class Router:
             self.login()
             if self.__current_menu != self.__desired_menu:
                 self.enter_menu(self.__desired_menu)
-        result = self.__make_request(self.__base_url + page, cookie=self.__sess_id_cookie, data=data)
-        if result is not None and "<IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>" in result:
-            try_count += 1
-            result = self.__request_page(page, try_count, is_query)
+        raw_result = self.__make_request(self.__base_url + page, cookie=self.__sess_id_cookie, data=data)
+        if raw_result is None:
+            raise Exception("Error requesting page, result is None")
+
+        if "<IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>" in raw_result:
+            raw_result = self.__request_page(page, try_count + 1, is_query)
+
+        result: str = raw_result
+
         if is_query and "<IF_ERRORSTR>SUCC</IF_ERRORSTR>" not in result:
             raise Exception("Error requesting page")
         if is_query:
@@ -185,8 +204,8 @@ class Router:
             self.__session_token = bytes.fromhex(new_token.replace("\\x", "")).decode('utf-8')
         return result
 
-    def request_page(self, page: str, is_query: bool = False) -> str:
-        return self.__request_page(page=page, is_query=is_query)
+    def request_page(self, page: str, is_query: bool = False) -> RouterResponse:
+        return RouterResponse(self.__request_page(page=page, is_query=is_query))
 
     def enter_menu(self, menu: str):
         if self.__current_menu != menu:
@@ -198,6 +217,9 @@ class Router:
         self.__desired_menu = menu
         self.__current_menu = menu
         return self.__request_page("?_type=menuView&_tag=" + menu + "&Menu3Location=0")
+
+    def request_time(self) -> RouterResponse:
+        return RouterResponse(self.__request_page("?_type=hiddenData&_tag=sntp_data", is_query=True))
 
     def request_stats(self) -> tuple[RouterResponse, RouterResponse]:
         self.enter_menu("dslWanStatus")
@@ -245,6 +267,7 @@ class Router:
         from cryptography.hazmat.primitives.asymmetric import padding
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import load_pem_public_key
+        from cryptography.hazmat.primitives.asymmetric import rsa
         import base64
 
         # Public key from the script
@@ -260,6 +283,9 @@ class Router:
 
         # Load the public key
         key = load_pem_public_key(pub_key.encode(), backend=default_backend())
+
+        if not isinstance(key, rsa.RSAPublicKey):
+            raise TypeError("Expected an RSA public key")
 
         # Encrypt the data using PKCS1v15 padding
         encrypted = key.encrypt(
